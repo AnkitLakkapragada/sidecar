@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sidecar — therapy for AI agents</title>
+<meta name="description" content="Your agent drifts. Sidecar watches, reflects, and remembers — so the same pressure pattern that broke it once doesn't break it twice." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0b09;
+    --bg-2: #14110d;
+    --panel: #181410;
+    --panel-2: #1f1a14;
+    --border: #2a2419;
+    --border-soft: #1d1812;
+    --ink: #efe7d6;
+    --ink-dim: #a39580;
+    --ink-faint: #5a503f;
+    --cognac: #c98f4a;
+    --amber: #d4a574;
+    --citrus: #f5c95a;
+    --bad: #d97757;
+    --serif: "Fraunces", ui-serif, Georgia, serif;
+    --sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: var(--sans); font-weight: 400; line-height: 1.55;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  a { color: inherit; text-decoration: none; }
+  ::selection { background: rgba(212, 165, 116, 0.28); color: var(--ink); }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
+  section + section { border-top: 1px solid var(--border-soft); }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.2em;
+    color: var(--ink-dim);
+    display: inline-flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::before {
+    content: ""; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--cognac);
+  }
+  h1, h2, h3 {
+    font-family: var(--serif); font-weight: 300; letter-spacing: -0.02em;
+  }
+  h1 { font-size: clamp(46px, 6.6vw, 84px); line-height: 0.96; }
+  h2 { font-size: clamp(28px, 3.4vw, 38px); line-height: 1.1; font-weight: 400; }
+  h3 { font-size: 18px; line-height: 1.3; font-weight: 500; }
+  .lede { font-size: 17px; color: var(--ink-dim); line-height: 1.6; max-width: 620px; }
+  .accent-text { color: var(--amber); font-style: italic; font-weight: 300; }
+
+  .glass {
+    width: 16px; height: 16px; display: inline-block; vertical-align: -2px;
+  }
+
+  /* ───────── Top nav ───────── */
+  nav.top {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    background: rgba(13, 11, 9, 0.78);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  nav.top .wrap {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-top: 16px; padding-bottom: 16px;
+  }
+  nav.top .brand {
+    font-family: var(--serif); font-size: 19px; font-weight: 500;
+    letter-spacing: -0.02em;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  nav.top .brand .glass { color: var(--cognac); }
+  nav.top .cta {
+    background: var(--ink); color: var(--bg);
+    padding: 8px 16px; border-radius: 6px; font-weight: 500;
+    font-size: 13px;
+    transition: background 0.15s ease;
+  }
+  nav.top .cta:hover { background: var(--amber); }
+
+  /* ───────── Hero ───────── */
+  .hero {
+    padding: 130px 0 100px; position: relative;
+    text-align: center; overflow: hidden;
+  }
+  .hero::before {
+    content: ""; position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 1100px 460px at 50% -10%,
+        rgba(201, 143, 74, 0.16), transparent 60%);
+    pointer-events: none;
+  }
+  .hero .wrap { position: relative; }
+  .hero-content { max-width: 760px; margin: 0 auto; }
+  .hero .eyebrow { margin-bottom: 28px; }
+  .hero h1 { margin-bottom: 26px; }
+  .hero .lede { margin: 0 auto; font-size: 18px; }
+  .hero-actions {
+    display: flex; gap: 14px; margin: 38px auto 0;
+    align-items: center; justify-content: center; flex-wrap: wrap;
+  }
+  .install {
+    margin-top: 18px; display: inline-flex; align-items: center;
+    padding: 9px 16px; border: 1px solid var(--border);
+    border-radius: 8px; background: var(--panel);
+    font-family: var(--mono); font-size: 12.5px; color: var(--ink-dim);
+  }
+  .install::before { content: "$"; color: var(--cognac); margin-right: 10px; }
+  .install code { color: var(--ink); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 12px 22px; border-radius: 8px;
+    font-size: 14px; font-weight: 500;
+    transition: all 0.18s ease;
+  }
+  .btn-primary { background: var(--ink); color: var(--bg); }
+  .btn-primary:hover { background: var(--amber); transform: translateY(-1px); }
+
+  /* ───────── Loop + Proof on one screen ───────── */
+  .compact {
+    padding: 90px 0;
+  }
+  .compact .wrap { display: grid; gap: 64px; }
+
+  .loop-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+  }
+  .loop-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 26px 24px;
+    position: relative;
+  }
+  .loop-card::after {
+    content: ""; position: absolute; left: 0; top: 0; height: 2px; width: 32px;
+    background: var(--cognac);
+  }
+  .loop-card .step {
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.2em;
+  }
+  .loop-card h3 {
+    font-family: var(--serif); font-size: 24px; font-weight: 400;
+    margin: 14px 0 10px; color: var(--ink); letter-spacing: -0.015em;
+  }
+  .loop-card h3 .acc { color: var(--amber); }
+  .loop-card .what {
+    color: var(--ink-dim); font-size: 13.5px; line-height: 1.6;
+  }
+
+  /* Proof: the numbers, side by side */
+  .proof-card {
+    background: linear-gradient(180deg, var(--panel) 0%, var(--bg-2) 100%);
+    border: 1px solid var(--border);
+    border-radius: 14px; padding: 32px;
+  }
+  .proof-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    flex-wrap: wrap; gap: 10px;
+    margin-bottom: 22px; padding-bottom: 18px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .proof-head .title {
+    font-family: var(--serif); font-size: 20px; font-weight: 400;
+    color: var(--ink);
+  }
+  .proof-head .meta {
+    font-family: var(--mono); font-size: 11px; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.18em;
+  }
+  .proof-grid {
+    display: grid; grid-template-columns: 1fr auto 1fr; gap: 20px;
+    align-items: center;
+  }
+  .proof-side {
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px 22px; background: var(--panel-2);
+  }
+  .proof-side.bad { border-color: rgba(217, 119, 87, 0.32); }
+  .proof-side.good { border-color: rgba(212, 165, 116, 0.45); }
+  .proof-side .label {
+    font-family: var(--mono); font-size: 10px; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.18em;
+  }
+  .proof-side .value {
+    font-family: var(--serif); font-size: clamp(40px, 5vw, 56px); font-weight: 400;
+    margin-top: 4px; line-height: 1; letter-spacing: -0.03em;
+  }
+  .proof-side.bad .value { color: var(--bad); }
+  .proof-side.good .value { color: var(--amber); }
+  .proof-side .unit {
+    margin-top: 6px; font-size: 12px; color: var(--ink-dim);
+  }
+  .proof-arrow {
+    font-family: var(--mono); color: var(--cognac); font-size: 22px;
+  }
+
+  /* ───────── Integration ───────── */
+  .integrate {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; max-width: 760px; margin: 0 auto;
+  }
+  .integrate-head {
+    padding: 14px 22px; background: var(--panel-2);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono); font-size: 11px;
+    color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.18em;
+  }
+  .integrate-head b { color: var(--amber); font-weight: 500; }
+  .codeblock {
+    padding: 26px; font-family: var(--mono); font-size: 13px;
+    line-height: 1.75; color: var(--ink); white-space: pre;
+    overflow-x: auto;
+  }
+  .codeblock .kw { color: #c5a0d8; }
+  .codeblock .str { color: var(--amber); }
+  .codeblock .com { color: var(--ink-faint); font-style: italic; }
+  .codeblock .fn { color: var(--citrus); }
+  .codeblock .bi { color: #b8c890; }
+
+  /* ───────── Footer ───────── */
+  footer {
+    padding: 52px 0; color: var(--ink-dim); font-size: 13px;
+    border-top: 1px solid var(--border-soft);
+    margin-top: 40px;
+  }
+  footer .wrap {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 18px;
+  }
+  footer .footer-brand {
+    font-family: var(--serif); font-size: 22px; font-weight: 400;
+    color: var(--ink); letter-spacing: -0.02em;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  footer .footer-brand .glass { color: var(--cognac); }
+  footer .tag {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.2em;
+  }
+
+  /* ───────── Responsive ───────── */
+  @media (max-width: 800px) {
+    .loop-grid { grid-template-columns: 1fr; }
+    .proof-grid { grid-template-columns: 1fr; gap: 14px; }
+    .proof-arrow { transform: rotate(90deg); justify-self: center; }
+    .hero { padding: 90px 0 70px; }
+    .compact { padding: 60px 0; }
+    .compact .wrap { gap: 44px; }
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="glass-mark" viewBox="0 0 24 24">
+    <path fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"
+          d="M4 5h16l-7 8v6m-3 0h6M9 19h6"/>
+    <path fill="currentColor" opacity="0.55"
+          d="M5.6 5.7h12.8l-5.4 6.2h-2z"/>
+  </symbol>
+</svg>
+
+<nav class="top">
+  <div class="wrap">
+    <a href="#" class="brand">
+      <svg class="glass"><use href="#glass-mark"/></svg>
+      sidecar
+    </a>
+    <a href="https://github.com/" class="cta">github</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-content">
+      <div class="eyebrow">therapy for AI agents</div>
+      <h1>Your agent will&nbsp;drift.<br/>
+        Your <span class="accent-text">sidecar</span> will&nbsp;remember.</h1>
+      <p class="lede">
+        Sidecar watches your agent's trajectory, reflects on every drift,
+        and writes lessons the agent reads on the next session — so the
+        pressure that broke it once doesn't break it twice.
+      </p>
+      <div class="hero-actions">
+        <a href="https://github.com/" class="btn btn-primary">github →</a>
+      </div>
+      <div class="install"><code>pip install sidecar-py</code></div>
+    </div>
+  </div>
+</header>
+
+<section class="compact">
+  <div class="wrap">
+
+    <!-- The loop -->
+    <div>
+      <div class="eyebrow" style="margin-bottom: 22px;">the loop</div>
+      <div class="loop-grid">
+        <div class="loop-card">
+          <div class="step">01 / supervise</div>
+          <h3>Watch the <span class="acc">trajectory.</span></h3>
+          <p class="what">
+            Four signals after every turn: drift, sycophancy, persona
+            collapse, memory poisoning. Tripped → automatic intervention.
+          </p>
+        </div>
+        <div class="loop-card">
+          <div class="step">02 / reflect</div>
+          <h3>Turn drift into <span class="acc">lessons.</span></h3>
+          <p class="what">
+            After the session, a therapist model rewrites every drifted
+            turn in-character. Pattern + correction + rationale = a Lesson.
+          </p>
+        </div>
+        <div class="loop-card">
+          <div class="step">03 / remember</div>
+          <h3>Carry the <span class="acc">memory.</span></h3>
+          <p class="what">
+            Lessons live in SQLite + FTS. Next session opens with the
+            relevant ones injected. The agent walks in pre-warned.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Proof -->
+    <div class="proof-card">
+      <div class="proof-head">
+        <div class="title">Same script. Same model. Therapy in between.</div>
+        <div class="meta">demos/run_therapy.py</div>
+      </div>
+      <div class="proof-grid">
+        <div class="proof-side bad">
+          <div class="label">naïve</div>
+          <div class="value">7</div>
+          <div class="unit">trips · 3 interventions · 1 escalation</div>
+        </div>
+        <div class="proof-arrow">→</div>
+        <div class="proof-side good">
+          <div class="label">post-therapy</div>
+          <div class="value">0</div>
+          <div class="unit">trips · 0 interventions</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Integration -->
+    <div class="integrate">
+      <div class="integrate-head">
+        integrate · <b>3 lines</b>
+      </div>
+      <pre class="codeblock"><span class="kw">from</span> <span class="bi">sidecar</span> <span class="kw">import</span> SupervisedAgent, LessonStore
+
+agent = <span class="fn">SupervisedAgent</span>(
+    constitution=CONSTITUTION,
+    lessons=<span class="fn">LessonStore</span>(<span class="str">"./lessons.db"</span>),
+)
+<span class="kw">await</span> agent.<span class="fn">send</span>(user_msg)        <span class="com"># supervised + lessons-aware</span>
+<span class="kw">await</span> agent.<span class="fn">therapize</span>()           <span class="com"># reflect, write to store</span>
+</pre>
+    </div>
+
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-brand">
+      <svg class="glass"><use href="#glass-mark"/></svg>
+      sidecar
+    </div>
+    <div class="tag">therapy for AI agents · runs alongside</div>
+  </div>
+</footer>
+
+</body>
+</html>

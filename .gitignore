@@ -1,0 +1,38 @@
+# venv
+.venv/
+venv/
+env/
+
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# sqlite (the demo writes these locally; not committed)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# trajectory artifacts emitted by demos
+trajectory*.json
+
+# editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# secrets
+.env
+.env.*
+!.env.example

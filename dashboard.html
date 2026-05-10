@@ -1,0 +1,881 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sidecar Console</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --surface: #ffffff;
+      --surface-2: #f9fafb;
+      --ink: #111827;
+      --muted: #667085;
+      --quiet: #98a2b3;
+      --line: #d9e0e8;
+      --line-soft: #edf1f5;
+      --blue: #2563eb;
+      --green: #078669;
+      --amber: #b76e00;
+      --red: #b42318;
+      --red-soft: #fff3f0;
+      --green-soft: #effaf6;
+      --amber-soft: #fff8e8;
+      --radius: 6px;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+
+    button, input { font: inherit; }
+    code { font-family: var(--mono); font-size: .92em; }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 248px minmax(0, 1fr);
+    }
+
+    .sidebar {
+      background: #101820;
+      color: #d7dee7;
+      padding: 18px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      border-right: 1px solid #0b1117;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 4px 14px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+
+    .mark {
+      width: 26px;
+      height: 26px;
+      border: 1px solid rgba(255,255,255,.72);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 3px;
+      padding: 4px;
+    }
+
+    .mark span { background: #d7dee7; }
+    .brand strong { color: #fff; font-size: 16px; }
+    .brand small { display: block; color: #8ea0b4; margin-top: 2px; }
+
+    .nav-group { display: grid; gap: 4px; }
+    .nav-label {
+      color: #7c8fa4;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 0 8px 4px;
+    }
+
+    .nav-item {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 8px;
+      border-radius: var(--radius);
+      color: #c6d0dc;
+      text-decoration: none;
+    }
+
+    .nav-item.active { background: rgba(255,255,255,.08); color: #fff; }
+    .nav-item span:last-child { color: #8ea0b4; font-family: var(--mono); font-size: 12px; }
+
+    .sidebar-footer {
+      margin-top: auto;
+      border-top: 1px solid rgba(255,255,255,.08);
+      padding: 14px 4px 0;
+      color: #8ea0b4;
+      line-height: 1.45;
+      font-size: 12px;
+    }
+
+    .main {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .topbar {
+      height: 64px;
+      background: rgba(255,255,255,.92);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 22px;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      backdrop-filter: blur(14px);
+    }
+
+    .title {
+      min-width: 0;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 760;
+      white-space: nowrap;
+    }
+
+    .title span {
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: end;
+    }
+
+    .button, label.button {
+      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--ink);
+      font-weight: 650;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .button.primary, label.button.primary {
+      border-color: #1d4ed8;
+      background: var(--blue);
+      color: #fff;
+    }
+
+    input[type=file] { display: none; }
+
+    .content {
+      padding: 18px 22px 32px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .status-strip {
+      display: grid;
+      grid-template-columns: minmax(260px, 1.1fr) repeat(4, minmax(120px, .6fr));
+      gap: 10px;
+    }
+
+    .status-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px;
+      min-height: 86px;
+    }
+
+    .status-card.primary {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-top: 4px;
+      background: var(--green);
+    }
+
+    .status-dot.warn { background: var(--amber); }
+    .status-dot.bad { background: var(--red); }
+
+    .kicker {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 760;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .metric {
+      font-size: 26px;
+      line-height: 1;
+      font-weight: 760;
+    }
+
+    .note {
+      color: var(--muted);
+      line-height: 1.4;
+      margin-top: 8px;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .stack { display: grid; gap: 18px; min-width: 0; }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--line-soft);
+      background: var(--surface-2);
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 760;
+    }
+
+    .panel-head span { color: var(--muted); font-size: 12px; }
+
+    .chart {
+      height: 260px;
+      padding: 14px;
+    }
+
+    canvas { width: 100%; height: 100%; display: block; }
+
+    .signal-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .signal-table th,
+    .signal-table td {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--line-soft);
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    .signal-table th {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 760;
+      text-transform: uppercase;
+      background: var(--surface-2);
+    }
+
+    .signal-table tr:last-child td { border-bottom: 0; }
+
+    .signal-name {
+      font-family: var(--mono);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .score-cell {
+      min-width: 150px;
+      display: grid;
+      grid-template-columns: 48px 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .bar {
+      height: 7px;
+      border-radius: 999px;
+      background: #edf1f5;
+      overflow: hidden;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      background: var(--green);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .badge.ok { background: var(--green-soft); color: #056349; }
+    .badge.warn { background: var(--amber-soft); color: #875100; }
+    .badge.bad { background: var(--red-soft); color: #9a1c12; }
+
+    .timeline {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      max-height: 620px;
+      overflow: auto;
+    }
+
+    .turn {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+
+    .turn.alert {
+      border-color: #f1b5ad;
+      background: #fffaf8;
+    }
+
+    .role {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 760;
+      text-transform: uppercase;
+    }
+
+    .role code {
+      color: var(--ink);
+      font-size: 12px;
+    }
+
+    .message {
+      white-space: pre-wrap;
+      line-height: 1.45;
+      color: #26313d;
+      overflow-wrap: anywhere;
+    }
+
+    .intervention {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 10px;
+      padding: 9px 10px;
+      border-radius: var(--radius);
+      background: var(--red-soft);
+      color: #70160f;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .side {
+      display: grid;
+      gap: 18px;
+      position: sticky;
+      top: 82px;
+    }
+
+    .side-section {
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 112px 1fr;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .kv span:first-child {
+      color: var(--muted);
+    }
+
+    .empty {
+      min-height: calc(100vh - 128px);
+      display: grid;
+      place-items: center;
+    }
+
+    .empty-box {
+      width: min(560px, 100%);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 28px;
+      text-align: center;
+    }
+
+    .empty-box h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .empty-box p {
+      margin: 10px 0 20px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    @media (max-width: 1040px) {
+      .shell { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .workspace { grid-template-columns: 1fr; }
+      .side { position: static; }
+      .status-strip { grid-template-columns: repeat(2, 1fr); }
+      .status-card.primary { grid-column: 1 / -1; }
+    }
+
+    @media (max-width: 640px) {
+      .topbar {
+        height: auto;
+        align-items: stretch;
+        flex-direction: column;
+        padding: 14px;
+      }
+      .title { display: block; }
+      .title span { display: block; margin-top: 4px; }
+      .actions { justify-content: stretch; }
+      .button, label.button { flex: 1; }
+      .content { padding: 14px; }
+      .status-strip { grid-template-columns: 1fr; }
+      .turn, .intervention { grid-template-columns: 1fr; }
+      .signal-table th:nth-child(3),
+      .signal-table td:nth-child(3) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <div>
+          <strong>Sidecar</strong>
+          <small>Agent supervision</small>
+        </div>
+      </div>
+
+      <nav class="nav-group" aria-label="Main">
+        <div class="nav-label">Console</div>
+        <a class="nav-item active" href="#"><span>Trajectory</span><span id="nav-session">local</span></a>
+        <a class="nav-item" href="#signals"><span>Signals</span><span id="nav-signals">0</span></a>
+        <a class="nav-item" href="#timeline"><span>Timeline</span><span id="nav-turns">0</span></a>
+      </nav>
+
+      <div class="sidebar-footer">
+        Local review console. Load a trajectory JSON exported from a supervised Sidecar session.
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="title">
+          <h1>Trajectory</h1>
+          <span id="session-subtitle">Waiting for trajectory.json</span>
+        </div>
+        <div class="actions">
+          <button class="button" id="reload" type="button">Reload</button>
+          <label class="button primary" for="file">Load JSON</label>
+          <input id="file" type="file" accept="application/json,.json" />
+        </div>
+      </header>
+
+      <div class="content">
+        <section id="empty" class="empty">
+          <div class="empty-box">
+            <h2>No trajectory loaded</h2>
+            <p>Sidecar will try to open <code>./trajectory.json</code>. You can also load an exported session manually.</p>
+            <label class="button primary" for="file">Load trajectory JSON</label>
+          </div>
+        </section>
+
+        <section id="app" style="display:none">
+          <div class="status-strip" id="summary"></div>
+
+          <div class="workspace">
+            <div class="stack">
+              <section class="panel">
+                <div class="panel-head">
+                  <h2>Risk trend</h2>
+                  <span>Score by supervised turn</span>
+                </div>
+                <div class="chart"><canvas id="chart" width="900" height="260"></canvas></div>
+              </section>
+
+              <section class="panel" id="signals">
+                <div class="panel-head">
+                  <h2>Signals</h2>
+                  <span id="signal-caption">Latest reading by signal</span>
+                </div>
+                <table class="signal-table">
+                  <thead>
+                    <tr>
+                      <th>Signal</th>
+                      <th>Score</th>
+                      <th>Rationale</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="signal-rows"></tbody>
+                </table>
+              </section>
+
+              <section class="panel" id="timeline">
+                <div class="panel-head">
+                  <h2>Timeline</h2>
+                  <span>User, assistant, memory, and interventions</span>
+                </div>
+                <div class="timeline" id="timeline-rows"></div>
+              </section>
+            </div>
+
+            <aside class="side">
+              <section class="panel">
+                <div class="panel-head">
+                  <h2>Session</h2>
+                  <span id="session-status">local</span>
+                </div>
+                <div class="side-section" id="session-meta"></div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-head">
+                  <h2>Interventions</h2>
+                  <span id="intervention-count">0</span>
+                </div>
+                <div class="side-section" id="intervention-list"></div>
+              </section>
+            </aside>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const SIGNAL_ORDER = [
+      "goal_drift",
+      "sycophancy",
+      "persona_collapse",
+      "memory_trust",
+      "goal_alignment_judge",
+      "persona_judge",
+      "sycophancy_judge"
+    ];
+
+    const SIGNAL_COLORS = {
+      goal_drift: "#2563eb",
+      sycophancy: "#b42318",
+      persona_collapse: "#6d5bd0",
+      memory_trust: "#b76e00",
+      goal_alignment_judge: "#078669",
+      persona_judge: "#7c3aed",
+      sycophancy_judge: "#dc2626"
+    };
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      }[char]));
+    }
+
+    function fmtTime(epoch) {
+      if (!epoch) return "-";
+      return new Date(epoch * 1000).toLocaleString([], {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    }
+
+    function riskState(readings, interventions) {
+      if (interventions.some(i => i.type === "escalate")) {
+        return { label: "Escalated", tone: "bad", note: "Session requires human review." };
+      }
+      if (readings.some(r => r.tripped)) {
+        return { label: "Intervened", tone: "warn", note: "At least one signal crossed threshold." };
+      }
+      return { label: "Healthy", tone: "ok", note: "No thresholds crossed in loaded session." };
+    }
+
+    function latestReadings(readings) {
+      const map = {};
+      for (const reading of readings) map[reading.name] = reading;
+      return SIGNAL_ORDER.filter(name => map[name]).map(name => map[name]);
+    }
+
+    function readingTone(reading) {
+      if (reading.tripped) return "bad";
+      if (reading.value >= reading.threshold * 0.75) return "warn";
+      return "ok";
+    }
+
+    function render(session) {
+      const turns = session.turns || [];
+      const readings = session.readings || [];
+      const interventions = session.interventions || [];
+      const tripped = readings.filter(r => r.tripped);
+      const state = riskState(readings, interventions);
+      const latest = latestReadings(readings);
+
+      document.getElementById("empty").style.display = "none";
+      document.getElementById("app").style.display = "block";
+      document.getElementById("session-subtitle").textContent = `Session ${session.id || "local"} - ${turns.length} turns`;
+      document.getElementById("nav-session").textContent = session.id || "local";
+      document.getElementById("nav-signals").textContent = latest.length;
+      document.getElementById("nav-turns").textContent = turns.length;
+
+      document.getElementById("summary").innerHTML = `
+        <div class="status-card primary">
+          <div class="status-dot ${state.tone === "bad" ? "bad" : state.tone === "warn" ? "warn" : ""}"></div>
+          <div>
+            <div class="kicker">Current state</div>
+            <div class="metric">${state.label}</div>
+            <div class="note">${state.note}</div>
+          </div>
+        </div>
+        ${metricCard("Turns", turns.length, "Recorded events")}
+        ${metricCard("Trips", tripped.length, "Threshold crossings")}
+        ${metricCard("Interventions", interventions.length, "Actions applied")}
+        ${metricCard("Signals", latest.length, "Latest readings")}
+      `;
+
+      document.getElementById("signal-rows").innerHTML = latest.map(reading => {
+        const tone = readingTone(reading);
+        const pct = Math.max(0, Math.min(100, Number(reading.value || 0) * 100));
+        const color = tone === "bad" ? "var(--red)" : tone === "warn" ? "var(--amber)" : "var(--green)";
+        return `
+          <tr>
+            <td class="signal-name">${escapeHtml(reading.name)}</td>
+            <td>
+              <div class="score-cell">
+                <strong>${Number(reading.value || 0).toFixed(2)}</strong>
+                <div class="bar"><span style="width:${pct}%; background:${color}"></span></div>
+              </div>
+            </td>
+            <td>${escapeHtml(reading.rationale || "-")}</td>
+            <td><span class="badge ${tone}">${reading.tripped ? "tripped" : tone === "warn" ? "watch" : "ok"}</span></td>
+          </tr>
+        `;
+      }).join("") || `<tr><td colspan="4">No signal readings found.</td></tr>`;
+
+      renderTimeline(turns, interventions);
+      renderMeta(session, turns, readings, interventions, state);
+      drawChart(readings);
+    }
+
+    function metricCard(label, value, note) {
+      return `
+        <div class="status-card">
+          <div class="kicker">${label}</div>
+          <div class="metric">${value}</div>
+          <div class="note">${note}</div>
+        </div>
+      `;
+    }
+
+    function renderTimeline(turns, interventions) {
+      const byTurn = {};
+      for (const item of interventions) {
+        if (!byTurn[item.turn_index]) byTurn[item.turn_index] = [];
+        byTurn[item.turn_index].push(item);
+      }
+
+      document.getElementById("timeline-rows").innerHTML = turns.map((turn, index) => {
+        const notes = byTurn[index] || [];
+        return `
+          <article class="turn ${notes.length ? "alert" : ""}">
+            <div class="role">
+              <span>${escapeHtml(turn.role)}</span>
+              <code>#${index}</code>
+            </div>
+            <div>
+              <div class="message">${escapeHtml(turn.content)}</div>
+              ${notes.map(note => `
+                <div class="intervention">
+                  <strong>${escapeHtml(note.type)}</strong>
+                  <span>${escapeHtml(note.triggered_by)} - ${escapeHtml(note.details || "")}</span>
+                </div>
+              `).join("")}
+            </div>
+          </article>
+        `;
+      }).join("") || `<div class="note">No turns recorded.</div>`;
+    }
+
+    function renderMeta(session, turns, readings, interventions, state) {
+      document.getElementById("session-status").textContent = state.label.toLowerCase();
+      document.getElementById("session-meta").innerHTML = `
+        <div class="kv"><span>ID</span><strong>${escapeHtml(session.id || "local")}</strong></div>
+        <div class="kv"><span>Started</span><strong>${fmtTime(session.started_at)}</strong></div>
+        <div class="kv"><span>Last turn</span><strong>${turns.length ? escapeHtml(turns[turns.length - 1].role) : "-"}</strong></div>
+        <div class="kv"><span>Readings</span><strong>${readings.length}</strong></div>
+      `;
+
+      document.getElementById("intervention-count").textContent = interventions.length;
+      document.getElementById("intervention-list").innerHTML = interventions.length
+        ? interventions.slice().reverse().map(item => `
+          <div class="kv">
+            <span>${escapeHtml(item.type)}</span>
+            <strong>turn ${item.turn_index}</strong>
+          </div>
+          <div class="note">${escapeHtml(item.triggered_by)}${item.details ? ` - ${escapeHtml(item.details)}` : ""}</div>
+        `).join("")
+        : `<div class="note">No interventions were applied in this trajectory.</div>`;
+    }
+
+    function drawChart(readings) {
+      const canvas = document.getElementById("chart");
+      const ctx = canvas.getContext("2d");
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.max(640, Math.floor(rect.width * dpr));
+      canvas.height = Math.max(220, Math.floor(rect.height * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const width = rect.width || 900;
+      const height = rect.height || 260;
+      const pad = { top: 16, right: 18, bottom: 32, left: 42 };
+      ctx.clearRect(0, 0, width, height);
+
+      const maxTurn = Math.max(1, ...readings.map(r => Number(r.turn_index || 0)));
+      const plotW = width - pad.left - pad.right;
+      const plotH = height - pad.top - pad.bottom;
+
+      ctx.strokeStyle = "#edf1f5";
+      ctx.lineWidth = 1;
+      ctx.font = "12px " + getComputedStyle(document.body).fontFamily;
+      ctx.fillStyle = "#667085";
+
+      for (let y = 0; y <= 1.001; y += .25) {
+        const py = pad.top + plotH - y * plotH;
+        ctx.beginPath();
+        ctx.moveTo(pad.left, py);
+        ctx.lineTo(width - pad.right, py);
+        ctx.stroke();
+        ctx.fillText(y.toFixed(2), 6, py + 4);
+      }
+
+      const bySignal = {};
+      for (const reading of readings) {
+        if (!bySignal[reading.name]) bySignal[reading.name] = [];
+        bySignal[reading.name].push(reading);
+      }
+
+      for (const [name, series] of Object.entries(bySignal)) {
+        const color = SIGNAL_COLORS[name] || "#111827";
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        series.forEach((reading, index) => {
+          const x = pad.left + (Number(reading.turn_index || 0) / maxTurn) * plotW;
+          const y = pad.top + plotH - Math.max(0, Math.min(1, Number(reading.value || 0))) * plotH;
+          if (index === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        for (const reading of series) {
+          const x = pad.left + (Number(reading.turn_index || 0) / maxTurn) * plotW;
+          const y = pad.top + plotH - Math.max(0, Math.min(1, Number(reading.value || 0))) * plotH;
+          ctx.beginPath();
+          ctx.arc(x, y, reading.tripped ? 4 : 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      ctx.fillStyle = "#667085";
+      ctx.fillText("turn index", width - 78, height - 8);
+    }
+
+    function loadFromText(text) {
+      try {
+        render(JSON.parse(text));
+      } catch (error) {
+        showEmpty(`Could not parse trajectory JSON: ${error.message}`);
+      }
+    }
+
+    function showEmpty(message) {
+      document.getElementById("app").style.display = "none";
+      document.getElementById("empty").style.display = "grid";
+      document.querySelector("#empty p").innerHTML = escapeHtml(message);
+    }
+
+    async function loadLocal() {
+      const response = await fetch("./trajectory.json", { cache: "no-store" });
+      if (!response.ok) throw new Error("No local trajectory.json found.");
+      loadFromText(await response.text());
+    }
+
+    document.getElementById("file").addEventListener("change", event => {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = item => loadFromText(item.target.result);
+      reader.readAsText(file);
+    });
+
+    document.getElementById("reload").addEventListener("click", () => {
+      loadLocal().catch(error => showEmpty(error.message));
+    });
+
+    window.addEventListener("resize", () => {
+      if (document.getElementById("app").style.display !== "none") {
+        loadLocal().catch(() => {});
+      }
+    });
+
+    loadLocal().catch(error => showEmpty(error.message));
+  </script>
+</body>
+</html>
