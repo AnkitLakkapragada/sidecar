@@ -37,7 +37,15 @@ Sidecar runs alongside your agent and does three things, in this order:
 That's the loop. Watch → reflect → remember. The agent's identity persists,
 the lessons it learned persist, capacity builds over time.
 
-## Quickstart
+## Install
+
+Use it as a library in your own project:
+
+```bash
+pip install git+https://github.com/AnkitLakkapragada/sidecar.git
+```
+
+Or clone for development / running the demos:
 
 ```bash
 git clone https://github.com/AnkitLakkapragada/sidecar.git

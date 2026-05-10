@@ -25,6 +25,10 @@ dist/
 # trajectory artifacts emitted by demos
 trajectory*.json
 
+# node (we don't use it; ignore stray artifacts)
+node_modules/
+package-lock.json
+
 # editor / OS
 .vscode/
 .idea/
