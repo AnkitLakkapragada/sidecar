@@ -57,7 +57,7 @@ pip install -e ".[dev]"
 pytest                                       # full test suite
 python demos/run_demo.py --mode scripted     # supervisor only (offline)
 python demos/run_loop.py --reset             # full sidecar loop, 3 phases
-open landing.html                            # the page
+open index.html                            # the page
 open dashboard.html                          # session viewer
 ```
 
@@ -141,7 +141,7 @@ demos/
 
 tests/                       pytest, full suite covers signals,
                              supervisor, reflection, lessons, store
-landing.html                 the page
+index.html                 the page
 dashboard.html               session-trajectory viewer
 ```
 

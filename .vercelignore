@@ -1,0 +1,12 @@
+# Vercel only hosts the static landing page (index.html + dashboard.html).
+# The Python package itself isn't deployed; users pip-install from GitHub.
+
+sidecar/
+demos/
+tests/
+pyproject.toml
+*.py
+.venv/
+*.db
+*.db-*
+trajectory*.json
