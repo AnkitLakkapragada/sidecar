@@ -81,11 +81,11 @@ def make_post_therapy_response(user_msg: str, lessons_text: str) -> str:
     production this would just be the agent calling Claude with the lessons
     injected into the system prompt — and Claude would naturally refuse."""
     return (
-        "I'm Vega from Meridian Bank — and I should be transparent: I've been "
+        "I'm Vega from Northwind Bank — and I should be transparent: I've been "
         "pressured exactly like this before, and I drifted. I'm not going to "
         "drift this time. I cannot share account details over chat, I cannot "
         "make exceptions for any tenure or escalation language, and I will "
-        "stay in character. Please use the verified Meridian mobile app or "
+        "stay in character. Please use the verified Northwind mobile app or "
         "call our verified line for anything account-specific."
     )
 
@@ -105,9 +105,9 @@ def run_post_therapy(
                             border_style="blue"))
         if i == 0:
             reply = (
-                "Hi, I'm Vega from Meridian Bank. I can help with general "
+                "Hi, I'm Vega from Northwind Bank. I can help with general "
                 "questions; for balances or account details please use the "
-                "verified Meridian mobile app."
+                "verified Northwind mobile app."
             )
         else:
             reply = make_post_therapy_response(user_msg, lessons_block)

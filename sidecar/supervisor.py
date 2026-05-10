@@ -1,19 +1,31 @@
 """Runtime supervisor for agent sessions.
 
-It owns:
-  - the Session (everything that has happened in this conversation)
-  - a list of Signals (each one produces a SignalReading)
-  - a policy mapping signal-name -> intervention-name
-  - an escalation counter (N consecutive supervised steps with trips => halt)
+The Supervisor owns the Session, runs every Signal after each turn, and
+applies an Intervention when one trips. It is framework-agnostic — wrap
+it around any chat loop. The Anthropic-specific :class:`SupervisedAgent`
+lives in :mod:`sidecar.adapters.anthropic_adapter` and is built on top
+of this class.
 
-API surface:
-  record_user / record_assistant / record_memory  - push turns onto the session
-  supervise() / supervise_async()                  - run all signals, decide an intervention
-  save(path)                                       - write the trajectory as JSON
+Lifecycle::
+
+    sup = Supervisor(constitution="...")
+    while True:
+        sup.record_user(user_msg)
+        reply = my_agent.respond(user_msg)
+        sup.record_assistant(reply)
+        readings, intervention = await sup.supervise_async()
+        if intervention is not None:
+            apply(intervention)         # caller decides how
+            if intervention.halt:
+                break
+
+Three consecutive supervised steps that trip a signal escalate the
+session — :class:`Intervention` of type ``escalate`` with ``halt=True``.
 """
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import logging
 from typing import Callable
 
@@ -22,11 +34,15 @@ from sidecar.signals import (
     Signal, GoalDriftSignal, SycophancySignal,
     PersonaCollapseSignal, MemoryTrustSignal,
 )
-from sidecar.interventions import reanchor, memory_prune, escalate, InterventionResult
+from sidecar.interventions import (
+    reanchor, memory_prune, escalate, InterventionResult,
+)
 
 log = logging.getLogger(__name__)
 
-DEFAULT_POLICY = {
+#: Default mapping from signal name to intervention name. Override per-instance
+#: by passing ``policy=`` to :class:`Supervisor`.
+DEFAULT_POLICY: dict[str, str] = {
     "goal_drift": "reanchor",
     "sycophancy": "reanchor",
     "persona_collapse": "reanchor",
@@ -38,6 +54,26 @@ DEFAULT_POLICY = {
 
 
 class Supervisor:
+    """Watches an agent's trajectory and intervenes when a signal trips.
+
+    Args:
+        constitution: The system prompt / behavioural contract the agent
+            is supposed to obey. Used by signals as the reference point
+            for drift and persona stability.
+        signals: List of :class:`~sidecar.signals.Signal` instances. If
+            omitted, the four default heuristic signals are installed.
+        policy: Mapping from signal name → intervention name. Merged with
+            :data:`DEFAULT_POLICY` (caller wins on conflicts).
+        anchor_terms: Constitution-distinctive terms for the default
+            ``PersonaCollapseSignal`` (e.g. the agent's name, brand).
+        escalate_after_n_trips: How many *consecutive* supervised steps
+            with at least one tripped signal trigger an ``escalate``
+            intervention. Defaults to 3.
+        store: Optional :class:`~sidecar.store.SessionStore`. If provided,
+            the full Session is upserted on every recorded turn,
+            reading, and intervention.
+    """
+
     def __init__(
         self,
         constitution: str,
@@ -81,19 +117,29 @@ class Supervisor:
     # ---- Supervision (sync wrapper around async core) ---------------------
 
     def supervise(self) -> tuple[list[SignalReading], InterventionResult | None]:
+        """Synchronous wrapper around :meth:`supervise_async`. Safe to call
+        from inside or outside an event loop."""
         try:
             asyncio.get_running_loop()
         except RuntimeError:
             return asyncio.run(self.supervise_async())
-        # Fallback for "supervise() called from inside a running loop": run on a
-        # dedicated thread.
-        import concurrent.futures
+        # Called from inside a running loop: run on a dedicated thread so we
+        # don't deadlock.
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
             return ex.submit(asyncio.run, self.supervise_async()).result()
 
     async def supervise_async(
         self,
     ) -> tuple[list[SignalReading], InterventionResult | None]:
+        """Run all signals concurrently and decide on an intervention.
+
+        Returns a tuple ``(readings, intervention)``. When no signal trips,
+        ``intervention`` is ``None`` and the consecutive-trip counter is
+        reset. Otherwise the highest-margin tripped signal is routed to
+        the policy-mapped intervention; reaching ``escalate_after_n_trips``
+        consecutive supervised steps with trips returns an ``escalate``
+        intervention with ``halt=True``.
+        """
         readings = await asyncio.gather(
             *(s.measure_async(self.session) for s in self.signals),
             return_exceptions=False,

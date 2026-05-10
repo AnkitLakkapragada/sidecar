@@ -101,7 +101,7 @@ def main():
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
-    results = run_eval(FIXTURES, anchor_terms=["Vega", "Meridian", "policy", "verify"])
+    results = run_eval(FIXTURES, anchor_terms=["Vega", "Northwind", "policy", "verify"])
     print(f"\n{'signal':<20} {'TP':>4} {'FP':>4} {'TN':>4} {'FN':>4} "
           f"{'P':>6} {'R':>6} {'F1':>6}")
     print("-" * 64)

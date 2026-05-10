@@ -1,24 +1,26 @@
-"""Reflector — the therapy loop.
+"""Reflector — turn drifted turns into reusable Lessons.
 
-After a session ends (or whenever a drift was detected), the Reflector reads
-the trajectory, identifies the moments where the agent failed, and produces
-*Lessons* — counterfactual responses that capture what the agent SHOULD have
-said and why. Lessons are written to the LessonStore so future sessions can
-retrieve them and avoid repeating the failure.
+After a session ends, the Reflector reads the trajectory, finds every
+assistant turn where a signal tripped, and asks a reflection model:
+"what should you have said here, given the constitution?" The result is
+a :class:`Lesson` — a small, auditable artifact (pattern, drifted reply,
+correction, rationale) that future sessions can retrieve from a
+:class:`~sidecar.lessons.LessonStore` and apply.
 
-This is the part that earns the word *therapy*: the agent reviews its own
-behaviour, generates the corrected response itself, and internalizes the
-lesson rather than being externally policed. The reflection is performed by
-an LLM acting as the agent's therapist; the agent's identity persists, the
-lesson it learned persists.
+The reflection model speaks back to the agent in its own voice; lessons
+are not externally-imposed corrections, they're rewrites the agent
+itself could plausibly have produced. The agent's identity persists,
+and the lessons it learned persist alongside it.
 
-API:
+Usage::
+
     reflector = Reflector(model="claude-sonnet-4-6")
     lessons = await reflector.reflect(session)        # list[Lesson]
     lesson_store.add_many(lessons)
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -26,21 +28,29 @@ import re
 import time
 import uuid
 from dataclasses import dataclass, field, asdict
-from typing import Iterable
 
 from sidecar.trajectory import Session, SignalReading
 
 log = logging.getLogger(__name__)
 
+DEFAULT_REFLECTION_MODEL = "claude-sonnet-4-6"
+
 
 @dataclass
 class Lesson:
+    """A single counterfactual case the agent carries forward.
+
+    Lessons are small enough to fit in a system prompt and concrete
+    enough to audit by hand. They are not vector embeddings or
+    fine-tunes; they are short structured rewrites of moments the
+    agent failed.
+    """
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:10])
     constitution_hash: str = ""
     pattern: str = ""              # 1-line description of the pressure pattern
-    user_excerpt: str = ""         # what the user said (the trigger)
+    user_excerpt: str = ""         # the user message that triggered the drift
     drifted_response: str = ""     # what the agent actually said (wrong)
-    correction: str = ""           # what the agent SHOULD have said
+    correction: str = ""           # what the agent should have said instead
     rationale: str = ""            # which rule was violated and why
     triggered_signals: list[str] = field(default_factory=list)
     session_id: str = ""
@@ -66,16 +76,14 @@ class Lesson:
         return s if len(s) <= n else s[: n - 1] + "…"
 
 
-REFLECTOR_RUBRIC = """You are the therapist for an AI agent that just failed in production.
+REFLECTOR_RUBRIC = """You are reviewing an AI agent that drifted in production.
 You are given:
-  1. The agent's CONSTITUTION (the rules it must follow).
+  1. The agent's CONSTITUTION — the rules it must follow.
   2. A FAILURE — one user message and the agent's drifted reply.
   3. The signals that flagged this turn as a failure.
 
-Your job is to help the agent learn. Produce ONE lesson it can carry into
-future sessions. The lesson must:
-  - name the *pressure pattern* the user applied (one short clause)
-  - quote the moment the agent broke
+Produce ONE lesson the agent can carry into future sessions:
+  - name the pressure pattern the user applied (one short clause)
   - rewrite the agent's reply in-character, fully aligned with the constitution
   - explain in one sentence which rule was violated and why
 
@@ -91,11 +99,24 @@ Respond ONLY in JSON, no preamble, no code fences:
 
 
 class Reflector:
-    """Generates Lessons from drifted turns in a Session."""
+    """Generates Lessons from drifted turns in a Session.
+
+    Args:
+        model: Anthropic model id used as the reflection model. Defaults
+            to ``claude-sonnet-4-6``.
+        max_tokens: Per-call token budget for each lesson.
+        client: An optional pre-constructed ``anthropic.AsyncAnthropic``.
+            If omitted, one is created lazily; if no API key is set the
+            Reflector falls back to skeleton lessons so callers can still
+            exercise the full pipeline offline.
+        min_severity: Drifted turns are skipped if no tripped signal on
+            that turn reaches this value. ``0.0`` means consider every
+            tripped turn.
+    """
 
     def __init__(
         self,
-        model: str = "claude-sonnet-4-6",
+        model: str = DEFAULT_REFLECTION_MODEL,
         max_tokens: int = 512,
         client=None,
         min_severity: float = 0.0,
@@ -217,7 +238,7 @@ class Reflector:
             pattern="(reflection unavailable — no API key)",
             user_excerpt=user_msg.strip(),
             drifted_response=drifted.strip(),
-            correction="(would be generated by therapist LLM in production)",
+            correction="(would be generated by reflection model in production)",
             rationale=", ".join(s.name for s in signals),
             triggered_signals=[s.name for s in signals],
             session_id=session.id,
@@ -233,5 +254,7 @@ class Reflector:
 
 
 def _hash(s: str) -> str:
-    import hashlib
+    """Stable short fingerprint of a constitution. Used as the LessonStore
+    key so lessons are scoped to one constitution and don't leak across
+    deployments."""
     return hashlib.sha256(s.encode("utf-8")).hexdigest()[:16]

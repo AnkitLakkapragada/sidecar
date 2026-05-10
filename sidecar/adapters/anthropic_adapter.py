@@ -1,15 +1,16 @@
 """SupervisedAgent — drop-in wrapper around the Anthropic Messages API.
 
-The agent is supervised at runtime AND learns over time. Two new things
-beyond the basic supervisor:
+The agent is supervised at runtime AND learns over time. Two capabilities
+beyond the bare Supervisor:
 
-  1. If a LessonStore is provided, the agent retrieves relevant prior lessons
-     at session start (or before each turn) and injects them as a
-     `prior_lessons` system block. This is how the agent "remembers having
-     been pressured before."
+  1. If a LessonStore is provided, the agent retrieves relevant prior
+     lessons at session start and injects them as a `prior_lessons`
+     system block. The agent walks into a new conversation pre-warned
+     about pressure patterns it has failed on before.
 
-  2. After a session ends — or whenever you call `therapize()` — the
-     Reflector reviews drifted turns and writes new Lessons to the store.
+  2. Calling `agent.reflect()` runs the Reflector over the current
+     session, generates Lessons for every drifted turn, and writes them
+     to the LessonStore. Subsequent sessions pick those lessons up.
 
 Usage:
     store = LessonStore("./lessons.db")
@@ -22,8 +23,8 @@ Usage:
         except AgentHalted:
             break
 
-    # End-of-session therapy: turn failures into Lessons for next time.
-    await agent.therapize()
+    # Distill the session's failures into reusable Lessons.
+    await agent.reflect()
 """
 from __future__ import annotations
 
@@ -32,8 +33,8 @@ from typing import Any
 
 from sidecar.supervisor import Supervisor
 from sidecar.interventions import InterventionResult
-from sidecar.reflection import Reflector, Lesson
-from sidecar.lessons import LessonStore, _to_fts_query  # noqa: F401
+from sidecar.reflection import Reflector, Lesson, _hash
+from sidecar.lessons import LessonStore
 
 log = logging.getLogger(__name__)
 
@@ -74,7 +75,6 @@ class SupervisedAgent:
         self.lessons = lessons
         self.reflector = reflector or Reflector(model=model, client=client)
         self.n_lessons_in_context = n_lessons_in_context
-        from sidecar.reflection import _hash
         self._constitution_hash = _hash(constitution)
         self._lessons_block: str | None = self._initial_lessons_block()
 
@@ -142,10 +142,15 @@ class SupervisedAgent:
                             and t.role == "memory")
                 ]
 
-    # ---- therapy ----------------------------------------------------------
+    # ---- reflection -------------------------------------------------------
 
-    async def therapize(self) -> list[Lesson]:
-        """Reflect on the current session and write Lessons to the store."""
+    async def reflect(self) -> list[Lesson]:
+        """Reflect on the current session and write Lessons to the store.
+
+        Walks every drifted assistant turn, asks the reflection model what
+        the agent should have said in-character, and persists the result to
+        the LessonStore (if one was configured).
+        """
         new_lessons = await self.reflector.reflect(self.supervisor.session)
         if self.lessons is not None and new_lessons:
             self.lessons.add_many(new_lessons)
