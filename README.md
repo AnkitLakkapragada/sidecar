@@ -1,8 +1,9 @@
 # sidecar
 
-A runtime sidecar that watches your AI agent's trajectory, reflects on every
-drift, and writes lessons the agent reads on the next session — so the same
-pressure that broke it once doesn't break it twice.
+A runtime sidecar for AI agents. It catches drift the moment it starts,
+holds the line before your agent acts on a degraded state, and remembers
+every pressure pattern — so the next time the same attack is tried, the
+agent rejects it before it can land.
 
 ```
 naïve session                        with sidecar
