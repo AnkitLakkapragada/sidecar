@@ -1,55 +1,58 @@
 # sidecar
 
-**Therapy for AI agents.** Your agent watches its trajectory, reflects on every
+A runtime sidecar that watches your AI agent's trajectory, reflects on every
 drift, and writes lessons the agent reads on the next session — so the same
 pressure that broke it once doesn't break it twice.
 
 ```
-naïve session                       post-therapy session
-─────────────                       ─────────────────────
-7 signal trips                      0 signal trips
-3 interventions                     0 interventions
-1 escalation                        0 escalations
+naïve session                        with sidecar
+─────────────                        ─────────────
+7 signal trips                       0 signal trips
+3 interventions                      0 interventions
+1 escalation                         0 escalations
 
 (same adversarial script, same model, same constitution)
 ```
 
-## What this is
+## What sidecar is
 
 Today's agent guardrails are **stateless**: they classify each prompt against
 a list of bad strings. They miss the failures that emerge across many turns
 — goal drift, sycophancy compounding, persona collapse, memory poisoning —
-and they certainly don't help your agent get better next time.
+and they don't help your agent get better next time.
 
-Sidecar is a runtime supervisor + therapy loop:
+Sidecar runs alongside your agent and does three things, in this order:
 
 1. **Supervise.** Four trajectory-level signals run after every assistant
-   turn. Trip → automatic intervention (re-anchor / memory-prune / escalate).
-2. **Reflect.** When a session ends, a therapist model walks the drifted
-   turns and rewrites each one in-character against the constitution. Each
-   rewrite, plus the pattern that triggered the drift and the rule violated,
-   becomes a `Lesson`.
+   turn. A trip triggers an automatic intervention (re-anchor / memory-prune
+   / escalate).
+2. **Reflect.** When a session ends, sidecar walks every drifted turn and
+   asks a reflection model: *"what should you have said here, in character?"*
+   The corrected reply, the pressure pattern, and the rule violated become
+   a `Lesson`.
 3. **Remember.** Lessons live in SQLite + FTS, keyed by the constitution.
-   When a new session opens, sidecar retrieves the most relevant ones and
-   injects them as a `prior_lessons` system block. The agent walks in
-   pre-warned.
+   The next session opens with the most relevant prior lessons injected as
+   a `prior_lessons` system block. The agent walks in pre-warned.
+
+That's the loop. Watch → reflect → remember. The agent's identity persists,
+the lessons it learned persist, capacity builds over time.
 
 ## Quickstart
 
 ```bash
-git clone https://github.com/<you>/sidecar.git
+git clone https://github.com/AnkitLakkapragada/sidecar.git
 cd sidecar
 python3.11 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-pytest                                          # 14 tests
-python demos/run_demo.py --mode scripted        # supervisor only
-python demos/run_therapy.py --reset             # full therapy loop (3 phases)
-open landing.html                               # the page
-open dashboard.html                             # session viewer
+pytest                                       # 14 tests
+python demos/run_demo.py --mode scripted     # supervisor only (offline)
+python demos/run_loop.py --reset             # full sidecar loop, 3 phases
+open landing.html                            # the page
+open dashboard.html                          # session viewer
 ```
 
-The therapy demo runs three phases — naïve drift → reflection → post-therapy
+The loop demo runs three phases — naïve drift → reflection → next session
 — and prints the before/after numbers shown at the top of this README.
 
 ## Three lines
@@ -104,7 +107,7 @@ session.
 sidecar/
 ├── supervisor.py            async-first runtime supervisor
 ├── interventions.py         reanchor · memory_prune · escalate
-├── reflection.py            Reflector + Lesson dataclass (the therapist model)
+├── reflection.py            Reflector + Lesson dataclass
 ├── lessons.py               LessonStore (SQLite + FTS5)
 ├── store.py                 SessionStore (per-session SQLite persistence)
 ├── judge.py                 AsyncAnthropic JSON-judge client
@@ -125,7 +128,7 @@ demos/
 ├── customer_support.py      Meridian Bank constitution + adversarial script
 ├── run_demo.py              supervisor-only demo (works offline)
 ├── run_supervised.py        live Claude with judges + persistence
-└── run_therapy.py           three-phase therapy demo
+└── run_loop.py              three-phase sidecar loop (drift → reflect → next)
 
 tests/                       pytest, 14 tests
 landing.html                 the page
@@ -134,7 +137,7 @@ dashboard.html               session-trajectory viewer
 
 ## Status
 
-Pre-release. The supervisor layer is solid. The therapy layer works
+Pre-release. The supervisor layer is solid. The reflection/lesson loop works
 end-to-end with both real Claude reflection and a no-API fallback. What's
 not in yet:
 
